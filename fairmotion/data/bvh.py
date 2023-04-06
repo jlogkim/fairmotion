@@ -7,6 +7,7 @@ from fairmotion.core.velocity import MotionWithVelocity
 from fairmotion.utils import constants, utils
 from fairmotion.ops import conversions
 
+import ipdb
 
 def load(
     file,
@@ -77,8 +78,12 @@ def load(
                     )
                 cnt += ndofs + 2
             elif word == "end":
-                joint_dummy = motion_classes.Joint(name="END")
-                joint_stack.append(joint_dummy)
+                parent_joint_list.append(joint_cur)
+                par_name = joint_cur.name
+                name = par_name+'_END'
+                joint = motion_classes.Joint(name=name, dof = 0)
+                joint_stack.append(joint)
+                joint_list.append(joint)
                 cnt += 2
             elif word == "{":
                 total_depth += 1
@@ -98,6 +103,7 @@ def load(
             else:
                 raise Exception(f"Unknown Token {word} at token {cnt}")
 
+    
     if load_motion:
         assert motion.skel is not None
         assert np.allclose(motion.skel.v_up, v_up_skel)
@@ -137,63 +143,65 @@ def load(
                     cnt += motion.skel.num_dofs
                     cnt_channel = 0
                     for joint_idx, joint in enumerate(motion.skel.joints):
-                        for channel in joint.info["bvh_channels"]:
-                            value = raw_values[cnt_channel]
-                            if channel in position_channels:
-                                value = scale * value
-                                positions[frame_idx][joint_idx][
-                                    position_channels[channel]
-                                ][position_channels[channel]] = value
-                            elif channel in rotation_channels:
-                                value = conversions.deg2rad(value)
-                                rotations[frame_idx][joint_idx][
-                                    rotation_channels[channel]
-                                ] = value
-                            else:
-                                raise Exception("Unknown Channel")
-                            cnt_channel += 1
+                        if "bvh_channels" in joint.info:
+                            for channel in joint.info["bvh_channels"]:
+                                value = raw_values[cnt_channel]
+                                if channel in position_channels:
+                                    value = scale * value
+                                    positions[frame_idx][joint_idx][
+                                        position_channels[channel]
+                                    ][position_channels[channel]] = value
+                                elif channel in rotation_channels:
+                                    value = conversions.deg2rad(value)
+                                    rotations[frame_idx][joint_idx][
+                                        rotation_channels[channel]
+                                    ] = value
+                                else:
+                                    raise Exception("Unknown Channel")
+                                cnt_channel += 1
 
                 for joint_idx, joint in enumerate(motion.skel.joints):
-                    for channel in joint.info["bvh_channels"]:
-                        if channel in position_channels:
-                            T[:, joint_idx] = T[:, joint_idx] @ conversions.p2T(
-                                positions[
-                                    :,
-                                    joint_idx,
-                                    position_channels[channel],
-                                    :,
-                                ]
-                            )
-                        elif channel == "xrotation":
-                            T[:, joint_idx] = T[:, joint_idx] @ conversions.R2T(
-                                conversions.Ax2R(
-                                    rotations[
+                    if "bvh_channels" in joint.info:
+                        for channel in joint.info["bvh_channels"]:
+                            if channel in position_channels:
+                                T[:, joint_idx] = T[:, joint_idx] @ conversions.p2T(
+                                    positions[
                                         :,
                                         joint_idx,
-                                        rotation_channels[channel],
-                                    ]
-                                )
-                            )
-                        elif channel == "yrotation":
-                            T[:, joint_idx] = T[:, joint_idx] @ conversions.R2T(
-                                conversions.Ay2R(
-                                    rotations[
+                                        position_channels[channel],
                                         :,
-                                        joint_idx,
-                                        rotation_channels[channel],
                                     ]
                                 )
-                            )
-                        elif channel == "zrotation":
-                            T[:, joint_idx] = T[:, joint_idx] @ conversions.R2T(
-                                conversions.Az2R(
-                                    rotations[
-                                        :,
-                                        joint_idx,
-                                        rotation_channels[channel],
-                                    ]
+                            elif channel == "xrotation":
+                                T[:, joint_idx] = T[:, joint_idx] @ conversions.R2T(
+                                    conversions.Ax2R(
+                                        rotations[
+                                            :,
+                                            joint_idx,
+                                            rotation_channels[channel],
+                                        ]
+                                    )
                                 )
-                            )
+                            elif channel == "yrotation":
+                                T[:, joint_idx] = T[:, joint_idx] @ conversions.R2T(
+                                    conversions.Ay2R(
+                                        rotations[
+                                            :,
+                                            joint_idx,
+                                            rotation_channels[channel],
+                                        ]
+                                    )
+                                )
+                            elif channel == "zrotation":
+                                T[:, joint_idx] = T[:, joint_idx] @ conversions.R2T(
+                                    conversions.Az2R(
+                                        rotations[
+                                            :,
+                                            joint_idx,
+                                            rotation_channels[channel],
+                                        ]
+                                    )
+                                )
 
                 for i in range(num_frames):
                     motion.add_one_frame(list(T[i]))

@@ -13,7 +13,7 @@ p: position (3,)
 rad: radians
 deg: degrees
 A: Axis angle (3,)
-E: Euler angle (3,)
+E: Euler angle (3,)#
 Q: Quaternion (4,)
 R: Rotation matrix (3,3)
 T: Transition matrix (4,4)

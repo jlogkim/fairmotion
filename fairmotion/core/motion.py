@@ -8,7 +8,6 @@ from fairmotion.utils import constants
 from fairmotion.ops import conversions
 from fairmotion.utils import utils
 
-
 class Joint(object):
     """Defines a joint. A hierarchy of joints form a skeleton.
 
@@ -38,6 +37,7 @@ class Joint(object):
         name=None,
         dof=3,
         xform_from_parent_joint=constants.eye_T(),
+        initial_rotation=constants.eye_T(),         
         parent_joint=None,
         limits=None,
         direction=None,
@@ -49,8 +49,10 @@ class Joint(object):
         self.index_child_joint = {}
         self.xform_global = constants.eye_T()
         self.xform_from_parent_joint = xform_from_parent_joint
+        self.initial_rotation = initial_rotation
         self.parent_joint = self.set_parent_joint(parent_joint)
         self.info = {"dof": dof}  # set ball joint by default
+
 
         self.length = length
 
@@ -88,7 +90,8 @@ class Joint(object):
 
     def add_child_joint(self, joint):
         assert isinstance(joint, Joint)
-        assert joint.name not in self.index_child_joint.keys()
+        assert ('end' in joint.name.lower() or joint.name not in self.index_child_joint.keys())
+        
         self.index_child_joint[joint.name] = len(self.child_joints)
         self.child_joints.append(joint)
         joint.set_parent_joint(self)
@@ -226,6 +229,7 @@ class Pose(object):
             return self.data[skel.get_index_joint(key)]
         else:
             joint = skel.get_joint(key)
+            
             T = np.dot(
                 joint.xform_from_parent_joint,
                 self.data[skel.get_index_joint(joint)],
